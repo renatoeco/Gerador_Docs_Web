@@ -21,7 +21,9 @@ RUN git pull origin main
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Expõe a porta padrão do Streamlit (8501)
-EXPOSE 8501
+EXPOSE 8080
 
 # Comando para rodar a aplicação
-CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "main.py", "--server.port=${PORT}", "--server.address=0.0.0.0"]
+
