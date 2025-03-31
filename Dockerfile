@@ -18,7 +18,7 @@ WORKDIR /app
 RUN git pull origin main
 
 # Instala as dependências do projeto
-RUN pip install --no-cache-dir -r app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Certifique-se de que o Streamlit está instalado
 RUN pip install streamlit
