@@ -4,6 +4,9 @@ FROM python:3.12
 # Instala o Git (necessário para clonar o repositório)
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
+# Atualiza o pip para a versão mais recente
+RUN pip install --upgrade pip
+
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
 
@@ -15,7 +18,7 @@ WORKDIR /app
 RUN git pull origin main
 
 # Instala as dependências do projeto
-RUN pip install -r /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Expõe a porta padrão do Streamlit (8501)
 EXPOSE 8501

@@ -142,7 +142,8 @@ def gerar_docs(caminho_xlsx, caminho_docx):
         label="Baixar ZIP com os arquivos .docx",
         data=zip_buffer,
         file_name="documentos_gerados.zip",
-        mime="application/zip"
+        mime="application/zip",
+        type='primary'
     )
 
     # Limpa o diretório temporário
