@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y git
 WORKDIR /app
 
 # Clona o repositório diretamente do GitHub
-RUN git clone https://github.com/renatoeco/docs-generator-web.git /
+RUN git clone https://github.com/renatoeco/Gerador_Docs_Web.git /app \
 
 # Instala as dependências do seu script (caso haja)
 RUN pip install --no-cache-dir -r requirements.txt
