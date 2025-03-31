@@ -15,7 +15,7 @@ WORKDIR /app
 RUN git pull origin main
 
 # Instala as dependências do projeto
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Expõe a porta padrão do Streamlit (8501)
 EXPOSE 8501
