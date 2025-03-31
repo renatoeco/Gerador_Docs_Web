@@ -20,10 +20,9 @@ RUN git pull origin main
 # Instala as dependências do projeto
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expõe a porta padrão do Streamlit (8501)
+# Expõe a porta padrão do Streamlit
 EXPOSE 8080
 
 # Comando para rodar a aplicação
-# CMD ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
-CMD ["streamlit", "run", "main.py", "--server.port=${PORT}", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "main.py", "--server.port=8080", "--server.address=0.0.0.0"]
 
