@@ -10,13 +10,20 @@ import shutil
 
 
 
-####################  functions
-
 # Função do diálogo do resultado final
 @st.dialog("Resultado")
-def resultado():
-    # Validar se todas as informações necessárias estão presentes
-    validate()
+def dialogo_resultado():
+    """
+    Chama a função para gerar os documentos em lote.
+    """
+
+    if st.session_state.success == "OK":
+        sucesso()
+    else:
+
+        parametro1 = st.session_state.sheet_path
+        parametro2 = st.session_state.model_path
+        gerar_docs(parametro1, parametro2)
 
     # Botão para reiniciar o processo
     if st.button("Reiniciar"):
@@ -24,138 +31,93 @@ def resultado():
         st.rerun()
 
 
-
-
-# Função para validar se tem todas as informações necessárias.
-def validate():
-    """
-    Verifica se todas as informações necessárias para gerar os documentos
-    estão presentes.
-    """
-    if "sheet_path" in st.session_state and "model_path" in st.session_state:
-        funcao_botao()
-    else:
-        st.session_state.success = "FALTA"    
-
-# Função do botão que vai executar
-def funcao_botao():
-    """
-    Chama a função para gerar os documentos em lote.
-    """
-    parametro1 = st.session_state.sheet_path
-    parametro2 = st.session_state.model_path
-    gerar_docs(parametro1, parametro2)
-
-
 def gerar_docs(caminho_xlsx, caminho_docx):
-    # Cria um diretório temporário para armazenar os arquivos gerados
+    # Se já foi gerado, não faz nada
+    if "zip_buffer" in st.session_state:
+        return
+    
     temp_dir = tempfile.mkdtemp()
-
-    # >>>>>> EXTRAIR <<<<<<
     doc_carregado = Document(caminho_docx)
     df_contratos = pd.read_excel(caminho_xlsx)
 
-    # >>>>>> TRANSFORMAR <<<<<<
     for index, row in df_contratos.iterrows():
-
         st.session_state.cont += 1
-
-        # Criar um documento novo
         document = Document()
         document.styles['Normal'].font.name = 'Arial'
 
-        # Adiciona o logotipo no cabeçalho
+        # Cabeçalho com imagem
         cabecalho = document.sections[0].header
         paragrafo = cabecalho.paragraphs[0]
-
         if st.session_state.image_path != "no_image":
-            imagem = st.session_state.image_path
             paragrafo.alignment = 1
-            paragrafo.add_run().add_picture(imagem, width=Inches(2))
+            paragrafo.add_run().add_picture(st.session_state.image_path, width=Inches(2))
 
         # Adiciona uma margem abaixo da imagem
         paragrafo_vazio = cabecalho.add_paragraph()
         paragrafo_vazio.space_after = Inches(0.5)
 
-        # Adiciona a imagem no footer
+        # Rodapé com imagem
         footer = document.sections[0].footer
         paragrafo_footer = footer.paragraphs[0]
-
         if st.session_state.image_footer_path != "no_image":
-            imagem_footer = st.session_state.image_footer_path
             paragrafo_footer.alignment = 1
-            paragrafo_footer.add_run().add_picture(imagem_footer, width=Inches(2))
+            paragrafo_footer.add_run().add_picture(st.session_state.image_footer_path, width=Inches(2))
 
-        # Monta os parágrafos com substituições e preserva a formatação
+        # Substituições de texto mantendo formatação
         for paragrafo in doc_carregado.paragraphs:
             alinhamento = paragrafo.alignment
             novo_paragrafo = document.add_paragraph()
             novo_paragrafo.alignment = alinhamento
 
-            # Itera sobre as "runs" de cada parágrafo para preservar a formatação
             for run in paragrafo.runs:
                 texto = run.text
-                # Substitui as variáveis no texto
                 for coluna in df_contratos.columns:
-                    variavel = "{{{" + coluna + "}}}"
-                    if variavel in texto:
-                        texto = texto.replace(variavel, str(row[coluna]))
-
-                # Adiciona o texto com a formatação
+                    texto = texto.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
                 novo_run = novo_paragrafo.add_run(texto)
-
-                # Copia a formatação do "run" original (negrito, itálico, etc.)
                 novo_run.bold = run.bold
                 novo_run.italic = run.italic
                 novo_run.underline = run.underline
                 novo_run.font.size = run.font.size
                 novo_run.font.name = run.font.name
 
-        # Cria os nomes dinâmicos para os arquivos finais
-        nome_arquivo = os.path.join(temp_dir, f"{row.iloc[0].replace('/', '_')}.docx")
+        # Nome do arquivo
+        nome_arquivo = os.path.join(temp_dir, f"{st.session_state.docs_name}{row.iloc[0].replace('/', '_')}.docx")
         document.save(nome_arquivo)
 
-    # Compacta os documentos em um arquivo ZIP
+    # Criar ZIP apenas uma vez
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for filename in os.listdir(temp_dir):
-            filepath = os.path.join(temp_dir, filename)
-            zip_file.write(filepath, os.path.basename(filepath))
+            zip_file.write(os.path.join(temp_dir, filename), filename)
 
-    # Volta para o início do buffer
     zip_buffer.seek(0)
+    st.session_state.zip_buffer = zip_buffer  # Salva no estado para evitar reexecução
+    shutil.rmtree(temp_dir)
 
-
-    # SUCESSO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     st.balloons()
     st.session_state.success = "OK"
-    st.session_state.hide_button = True
 
-    # Mensagem de sucesso
+    sucesso()
+
+
+def sucesso():
+
     if st.session_state.success == "OK":
         st.success(f'{st.session_state.cont} documentos gerados com sucesso!')
-    elif st.session_state.success == "FALTA":
-        st.warning("Você precisa escolher a TABELA e o MODELO (etapas 2 e 3).")
 
-    # Oferece o arquivo ZIP para download
-    st.download_button(
-        label="Baixar ZIP com os arquivos .docx",
-        data=zip_buffer,
-        file_name="documentos_gerados.zip",
-        mime="application/zip",
-        type='primary'
-    )
-
-    # Limpa o diretório temporário
-    shutil.rmtree(temp_dir)
-    del zip_buffer  # Libera o buffer em memória
-
-
-
+        st.download_button(
+            label="Baixar ZIP com os arquivos .docx",
+            data=st.session_state.zip_buffer,
+            file_name="documentos_gerados.zip",
+            mime="application/zip",
+            type='primary'
+        )
 
 
 # Função principal
 def main():
+
+
     # Inicializa a contagem de documentos
     if not "cont" in st.session_state: 
         st.session_state.cont = 0
@@ -164,9 +126,10 @@ def main():
     if not "success" in st.session_state: 
         st.session_state.success = ""
 
-    # Inicializa o marcador de esconder o botão
-    if not "hide_button" in st.session_state:
-        st.session_state.hide_button = False
+    # Inicializa o prefixo do documento no session_state
+    if not "docs_name" in st.session_state:
+        st.session_state.docs_name = ""
+
 
     # Mostra o logotipo
     logo = "https://avatars.githubusercontent.com/u/85522293?v=4"
@@ -190,6 +153,7 @@ def main():
     opcao_imagem = st.selectbox('', ('Continuar sem imagem no cabeçalho', 'Carregar imagem'))
 
     if opcao_imagem == "Carregar imagem":
+        st.write('Lembre-se de ajustar o tamanho da imagem antes de carregar')
         arquivo_enviado = st.file_uploader("Escolha uma imagem (PNG, JPG ou JPEG)", type=["png", "jpg", "jpeg"])
         if arquivo_enviado:
             st.session_state.image_path = arquivo_enviado
@@ -210,7 +174,7 @@ def main():
     st.markdown("<span style='color:gray;'>A <strong>primeira coluna da tabela</strong> será usada no <strong>nome dos arquivos</strong> gerados.</span>", unsafe_allow_html=True)
 
     # Upload do arquivo diretamente (sem botão separado)
-    arquivo_enviado = st.file_uploader("", type=["xlsx"])
+    arquivo_enviado = st.file_uploader("Escolha a tabela (.xlsx)", type=["xlsx"])
 
     # Salva no session_state apenas se o usuário enviar um arquivo
     if arquivo_enviado is not None:
@@ -234,6 +198,7 @@ def main():
     opcao_imagem_rodape = st.selectbox('', ('Continuar sem imagem no rodapé', 'Carregar imagem'))
 
     if opcao_imagem_rodape == "Carregar imagem":
+        st.write('Lembre-se de ajustar o tamanho da imagem antes de carregar')
         arquivo_enviado = st.file_uploader("Escolha uma imagem para o rodapé", type=["png", "jpg", "jpeg"])
         if arquivo_enviado:
             st.session_state.image_footer_path = arquivo_enviado
@@ -243,24 +208,37 @@ def main():
 
     # Verificando se as informações estão presentes no session_state
     if "image_footer_path" in st.session_state:
-        if st.session_state.image_footer_path == "no_image":
-            st.write("Não usar imagem no rodapé.")
-        else:
+        if st.session_state.image_footer_path != "no_image":
             col1, col2 = st.columns([1, 3])
             col1.write("Imagem escolhida:")
             col2.image(st.session_state.image_footer_path, width=150)
 
+
     # Passo 5 - Escolha o nome dos arquivos ----------------------------------------------
-    st.markdown("<h5 style='padding-top: 40px'>5. Qual nome deseja dar aos documentos?</h5>", unsafe_allow_html=True)
-    if "docs_name" not in st.session_state:
-        nome_doc_input = st.text_input("Digite e APERTE ENTER")
-        if nome_doc_input != "":
-            st.session_state.docs_name = nome_doc_input
+    st.markdown("<h5 style='padding-top: 40px'>5. Deseja adicionar um prefixo ao nome dos documentos?</h5>", unsafe_allow_html=True)
+    # if "docs_name" not in st.session_state:
+    with st.form(key='prefixo_form', border=False):
+
+
+        nome_doc_input = st.text_input('O nome dos documentos será: "prefixo" + "texto da primeira coluna da tabela". Exemplo: "Recibo_João Alves"')
+
+        col1, col2 = st.columns([1, 3])
+
+        submit_button = col1.form_submit_button(label='Confirmar prefixo')
+        if submit_button and nome_doc_input != "":
+            st.session_state.docs_name = nome_doc_input + "_"
+            col2.write(':material/check:')
+
+
 
     # Passo 6 - Gerar documentos ----------------------------------------------
     st.markdown("<h5 style='padding-top: 40px'>6. Clique no botão abaixo para gerar os documentos:</h5>", unsafe_allow_html=True)
-    st.button("Gerar documentos!", type="primary", disabled=st.session_state.hide_button, on_click=resultado)
 
+    if st.button("Gerar documentos!", type="primary"):
+        if "sheet_path" in st.session_state and "model_path" in st.session_state:
+          dialogo_resultado()
+        else:
+            st.warning('Você precisa escolher a TABELA DE INFORMAÇÕES e o DOCUMENTO MODELO (etapas 2 e 3).')   
 
 
 if __name__ == "__main__":
