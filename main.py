@@ -1,13 +1,12 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 import pandas as pd
 import os
 import zipfile
 import tempfile
 from io import BytesIO
 import shutil
-
 
 
 # Função do diálogo do resultado final
@@ -25,17 +24,11 @@ def dialogo_resultado():
         parametro2 = st.session_state.model_path
         gerar_docs(parametro1, parametro2)
 
-    # Botão para reiniciar o processo
-    if st.button("Reiniciar"):
-        st.session_state.clear()
-        st.rerun()
-
 
 def gerar_docs(caminho_xlsx, caminho_docx):
-    # Se já foi gerado, não faz nada
     if "zip_buffer" in st.session_state:
         return
-    
+
     temp_dir = tempfile.mkdtemp()
     doc_carregado = Document(caminho_docx)
     df_contratos = pd.read_excel(caminho_xlsx)
@@ -51,10 +44,7 @@ def gerar_docs(caminho_xlsx, caminho_docx):
         if st.session_state.image_path != "no_image":
             paragrafo.alignment = 1
             paragrafo.add_run().add_picture(st.session_state.image_path, width=Inches(2))
-
-        # Adiciona uma margem abaixo da imagem
-        paragrafo_vazio = cabecalho.add_paragraph()
-        paragrafo_vazio.space_after = Inches(0.5)
+        cabecalho.add_paragraph().space_after = Inches(0.5)
 
         # Rodapé com imagem
         footer = document.sections[0].footer
@@ -63,41 +53,55 @@ def gerar_docs(caminho_xlsx, caminho_docx):
             paragrafo_footer.alignment = 1
             paragrafo_footer.add_run().add_picture(st.session_state.image_footer_path, width=Inches(2))
 
-        # Substituições de texto mantendo formatação
-        for paragrafo in doc_carregado.paragraphs:
-            alinhamento = paragrafo.alignment
-            novo_paragrafo = document.add_paragraph()
-            novo_paragrafo.alignment = alinhamento
-
-            for run in paragrafo.runs:
-                texto = run.text
-                for coluna in df_contratos.columns:
-                    texto = texto.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
-                novo_run = novo_paragrafo.add_run(texto)
-                novo_run.bold = run.bold
-                novo_run.italic = run.italic
-                novo_run.underline = run.underline
-                novo_run.font.size = run.font.size
-                novo_run.font.name = run.font.name
+        # Criar conteúdo na mesma ordem do modelo
+        for element in doc_carregado.element.body:
+            if element.tag.endswith('p'):
+                paragrafo = next((p for p in doc_carregado.paragraphs if p._element is element), None)
+                if paragrafo:
+                    novo_paragrafo = document.add_paragraph()
+                    novo_paragrafo.alignment = paragrafo.alignment
+                    for run in paragrafo.runs:
+                        texto = run.text
+                        for coluna in df_contratos.columns:
+                            texto = texto.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
+                        novo_run = novo_paragrafo.add_run(texto)
+                        novo_run.bold = run.bold
+                        novo_run.italic = run.italic
+                        novo_run.underline = run.underline
+                        novo_run.font.size = run.font.size
+                        novo_run.font.name = run.font.name
+            elif element.tag.endswith('tbl'):
+                tabela = next((t for t in doc_carregado.tables if t._element is element), None)
+                if tabela:
+                    nova_tabela = document.add_table(rows=len(tabela.rows), cols=len(tabela.columns))
+                    nova_tabela.style = tabela.style
+                    for i, row_tabela in enumerate(tabela.rows):
+                        for j, cell in enumerate(row_tabela.cells):
+                            texto_celula = cell.text
+                            for coluna in df_contratos.columns:
+                                texto_celula = texto_celula.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
+                            nova_tabela.cell(i, j).text = texto_celula
 
         # Nome do arquivo
         nome_arquivo = os.path.join(temp_dir, f"{st.session_state.docs_name}{row.iloc[0].replace('/', '_')}.docx")
         document.save(nome_arquivo)
 
-    # Criar ZIP apenas uma vez
+    # Criar ZIP
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for filename in os.listdir(temp_dir):
             zip_file.write(os.path.join(temp_dir, filename), filename)
 
     zip_buffer.seek(0)
-    st.session_state.zip_buffer = zip_buffer  # Salva no estado para evitar reexecução
+    st.session_state.zip_buffer = zip_buffer
     shutil.rmtree(temp_dir)
 
     st.balloons()
     st.session_state.success = "OK"
-
     sucesso()
+
+
+
 
 
 def sucesso():
