@@ -8,6 +8,12 @@ import tempfile
 from io import BytesIO
 import shutil
 
+from docx.oxml import OxmlElement
+from docx.oxml.ns import nsdecls
+from docx.oxml import parse_xml
+from docx.oxml.ns import qn
+
+
 
 # Função do diálogo do resultado final
 @st.dialog("Resultado")
@@ -23,6 +29,27 @@ def dialogo_resultado():
         parametro1 = st.session_state.sheet_path
         parametro2 = st.session_state.model_path
         gerar_docs(parametro1, parametro2)
+
+
+
+
+def adicionar_bordas_tabela(tabela):
+    """Adiciona bordas de 1pt a todas as células de uma tabela."""
+    for row in tabela.rows:
+        for cell in row.cells:
+            tc = cell._tc
+            tcPr = tc.get_or_add_tcPr()
+            tcBorders = OxmlElement('w:tcBorders')
+
+            for border_tag in ['top', 'left', 'bottom', 'right']:
+                border = OxmlElement(f'w:{border_tag}')
+                border.set(qn('w:val'), 'single')
+                border.set(qn('w:sz'), '8')  # 1 pt (8 em docx)
+                border.set(qn('w:space'), '0')
+                border.set(qn('w:color'), 'auto')
+                tcBorders.append(border)
+
+            tcPr.append(tcBorders)
 
 
 def gerar_docs(caminho_xlsx, caminho_docx):
@@ -60,27 +87,50 @@ def gerar_docs(caminho_xlsx, caminho_docx):
                 if paragrafo:
                     novo_paragrafo = document.add_paragraph()
                     novo_paragrafo.alignment = paragrafo.alignment
+
+                    # Copiar estilo do parágrafo original
+                    novo_paragrafo.style = paragrafo.style
+
                     for run in paragrafo.runs:
                         texto = run.text
                         for coluna in df_contratos.columns:
                             texto = texto.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
                         novo_run = novo_paragrafo.add_run(texto)
+
+                        # Copiar estilo do run original
                         novo_run.bold = run.bold
                         novo_run.italic = run.italic
                         novo_run.underline = run.underline
                         novo_run.font.size = run.font.size
                         novo_run.font.name = run.font.name
+                        novo_run.font.color.rgb = run.font.color.rgb  # Copiar cor da fonte
+                        novo_run.font.highlight_color = run.font.highlight_color  # Copiar cor de destaque
+
+                    # Copiar cor do estilo de título e subtítulo
+                    if paragrafo.style.name.startswith("Heading") and paragrafo.runs:
+                        for novo_run, original_run in zip(novo_paragrafo.runs, paragrafo.runs):
+                            if original_run.font.color.rgb:
+                                novo_run.font.color.rgb = original_run.font.color.rgb
+
             elif element.tag.endswith('tbl'):
                 tabela = next((t for t in doc_carregado.tables if t._element is element), None)
                 if tabela:
                     nova_tabela = document.add_table(rows=len(tabela.rows), cols=len(tabela.columns))
                     nova_tabela.style = tabela.style
+
                     for i, row_tabela in enumerate(tabela.rows):
                         for j, cell in enumerate(row_tabela.cells):
                             texto_celula = cell.text
                             for coluna in df_contratos.columns:
                                 texto_celula = texto_celula.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
                             nova_tabela.cell(i, j).text = texto_celula
+
+                            # Copiar cor da fonte da célula, se existir
+                            if cell.paragraphs and cell.paragraphs[0].runs:
+                                nova_tabela.cell(i, j).paragraphs[0].runs[0].font.color.rgb = cell.paragraphs[0].runs[0].font.color.rgb  
+
+                    # Aplicar bordas à nova tabela
+                    adicionar_bordas_tabela(nova_tabela)
 
         # Nome do arquivo
         nome_arquivo = os.path.join(temp_dir, f"{st.session_state.docs_name}{row.iloc[0].replace('/', '_')}.docx")
