@@ -120,7 +120,7 @@ def gerar_docs(caminho_xlsx, caminho_docx):
                     for run in paragrafo.runs:
                         texto = run.text
                         for coluna in df_contratos.columns:
-                            texto = texto.replace(f"{{{{{coluna}}}}}", str(row[coluna]))
+                            texto = texto.replace(f"{{{{coluna}}}}", str(row[coluna]))
                         novo_run = novo_paragrafo.add_run(texto)
 
                         # Copiar estilo do run original
