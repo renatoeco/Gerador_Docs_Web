@@ -114,28 +114,37 @@ def gerar_docs(caminho_xlsx, caminho_docx):
         for element in doc_carregado.element.body:
 
             if element.tag.endswith('p'):
+                # Localiza o parágrafo correspondente no documento carregado
                 paragrafo = next((p for p in doc_carregado.paragraphs if p._element is element), None)
                 if paragrafo:
+                    # Adiciona um novo parágrafo no documento
                     novo_paragrafo = document.add_paragraph()
                     novo_paragrafo.alignment = paragrafo.alignment
 
-                    # Copiar estilo do parágrafo original
+                    # Copia o estilo do parágrafo original
                     novo_paragrafo.style = paragrafo.style
 
+                    # Itera sobre cada 'run' no parágrafo original
                     for run in paragrafo.runs:
                         texto = run.text
+
+                        # Substitui variáveis no texto pelo valor correspondente
                         for coluna in df_contratos.columns:
-                            texto = texto.replace(f"{{{{coluna}}}}", str(row[coluna]))
+                            variavel = "{{{" + coluna + "}}}"
+                            if variavel in texto:
+                                texto = texto.replace(variavel, str(row[coluna]))
+
+                        # Adiciona o texto processado ao novo parágrafo
                         novo_run = novo_paragrafo.add_run(texto)
 
-                        # Copiar estilo do run original
+                        # Copia o estilo do 'run' original
                         novo_run.bold = run.bold
                         novo_run.italic = run.italic
                         novo_run.underline = run.underline
                         novo_run.font.size = run.font.size
                         novo_run.font.name = run.font.name
-                        novo_run.font.color.rgb = run.font.color.rgb  # Copiar cor da fonte
-                        novo_run.font.highlight_color = run.font.highlight_color  # Copiar cor de destaque
+                        novo_run.font.color.rgb = run.font.color.rgb  # Copia cor da fonte
+                        novo_run.font.highlight_color = run.font.highlight_color  # Copia cor de destaque
 
                     # Garantir que títulos, subtítulos e headings sejam pretos
                     if paragrafo.style.name.startswith("Heading") and novo_paragrafo.runs:
