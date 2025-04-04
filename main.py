@@ -78,7 +78,14 @@ def gerar_docs(caminho_xlsx, caminho_docx):
     doc_carregado = Document(caminho_docx)
     df_contratos = pd.read_excel(caminho_xlsx)
 
+    # Cria a barra de progresso apenas uma vez
+    progress_bar = st.progress(0, text="Iniciando...")
+
     for index, row in df_contratos.iterrows():
+        
+        # Atualiza a barra de progresso a cada iteração
+        progress_bar.progress(index / len(df_contratos), text=f'Gerando documento {index + 1} de {len(df_contratos)}')
+        
         st.session_state.cont += 1
         document = Document()
         document.styles['Normal'].font.name = 'Arial'
@@ -100,6 +107,7 @@ def gerar_docs(caminho_xlsx, caminho_docx):
 
         # Criar conteúdo na mesma ordem do modelo
         for element in doc_carregado.element.body:
+
             if element.tag.endswith('p'):
                 paragrafo = next((p for p in doc_carregado.paragraphs if p._element is element), None)
                 if paragrafo:
