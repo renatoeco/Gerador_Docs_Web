@@ -14,6 +14,10 @@ from docx.oxml.ns import qn
 
 import streamlit.components.v1 as components
 
+# Nome da página
+st.set_page_config(page_title="Gerador de Documentos")
+
+
 # HTML com a tag do GA4
 ga4_tag = """
 <!-- Google tag (gtag.js) -->
@@ -29,6 +33,7 @@ ga4_tag = """
 
 # Renderiza o HTML no frontend (dentro de um iframe invisível)
 components.html(ga4_tag, height=0, width=0)
+
 
 
 
